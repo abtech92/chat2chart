@@ -183,7 +183,67 @@
         .example-chip{animation:fadeUp .5s ease-out;animation-fill-mode:both}
         .example-chip:nth-child(1){animation-delay:.1s}.example-chip:nth-child(2){animation-delay:.15s}.example-chip:nth-child(3){animation-delay:.2s}.example-chip:nth-child(4){animation-delay:.25s}.example-chip:nth-child(5){animation-delay:.3s}
 
-        @media(max-width:640px){.config-row{flex-direction:column}.pipeline-steps{flex-direction:column;gap:8px}.pipeline-connector{display:none!important}}
+        /* ---- MOBILE RESPONSIVE ---- */
+        @media(max-width:768px){
+            .header{padding:24px 16px 36px}
+            .header h1{font-size:22px}
+            .search-container{margin-top:-20px;padding:0 10px}
+            .search-box{padding:14px;border-radius:12px}
+            .config-row{flex-direction:column;gap:8px;margin-bottom:12px;padding-bottom:12px}
+            .config-group{min-width:100%}
+            .input-row{flex-direction:column;gap:8px}
+            .input-row textarea{font-size:14px;min-height:44px;padding:12px 14px}
+            .btn-primary{width:100%;padding:14px;text-align:center;border-radius:10px}
+            .examples{padding:0 10px;gap:6px;justify-content:center}
+            .example-chip{font-size:11px;padding:6px 12px}
+            .pipeline{padding:0 10px;margin:16px auto}
+            .pipeline-inner{padding:16px 10px;border-radius:10px}
+            .pipeline-steps{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+            .pipeline-connector{display:none!important}
+            .pipeline-step .step-icon{width:36px;height:36px;font-size:12px;border-radius:8px}
+            .pipeline-step .step-label{font-size:9px;letter-spacing:.3px}
+            .pipeline-step .step-detail{font-size:9px}
+            .pipeline-info{font-size:10px;flex-wrap:wrap;gap:4px}
+            .pipeline-info span{display:inline-block}
+            .debug-panel{padding:0 10px}
+            .debug-pre{font-size:10px;padding:10px 12px;max-height:200px}
+            .schema-panel{padding:0 10px}
+            .results-area{padding:0 10px;margin:16px auto}
+            .toolbar{flex-direction:column;align-items:stretch;gap:8px}
+            .toolbar-left{flex-wrap:wrap;gap:6px}
+            .toolbar-right{justify-content:flex-end}
+            .toolbar-btn{padding:7px 10px;font-size:11px}
+            .sql-panel{padding:14px;border-radius:10px}
+            .sql-panel textarea{font-size:11px;padding-right:80px;min-height:50px}
+            .sql-panel .sql-actions{top:8px;right:8px;gap:4px}
+            .sql-panel .sql-btn{padding:4px 8px;font-size:9px}
+            .chart-container{padding:16px;border-radius:10px}
+            .chart-title{font-size:15px}
+            .chart-subtitle{font-size:11px;margin-bottom:14px}
+            #chart{min-height:250px}
+            .data-table th{padding:8px 10px;font-size:9px}
+            .data-table td{padding:7px 10px;font-size:11px}
+            .data-table-container{overflow-x:auto}
+            .history{padding:0 10px 24px;margin:16px auto}
+            .history-item{padding:10px 12px;font-size:12px;flex-direction:column;align-items:flex-start;gap:4px}
+            .history-item .meta{font-size:9px}
+            .chart-suggest .inner{flex-direction:column;align-items:stretch;text-align:center}
+            .chart-suggest .suggest-btn{width:100%}
+            .error-msg{padding:0 10px}
+            .warning-msg{padding:0 10px}
+            .setup-grid{grid-template-columns:1fr}
+        }
+        @media(max-width:400px){
+            .header h1{font-size:20px}
+            .pipeline-steps{grid-template-columns:1fr 1fr;gap:8px}
+            .pipeline-step .step-icon{width:32px;height:32px;font-size:11px}
+            .pipeline-step .step-label{font-size:8px}
+            .examples{flex-direction:column;align-items:stretch}
+            .example-chip{text-align:center}
+            .toolbar-btn{font-size:10px;padding:6px 8px}
+            .chart-container{padding:12px}
+            #chart{min-height:200px}
+        }
         @media print{
             body{background:#fff!important;color:#0f172a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
             .header,.search-container,.examples,.pipeline,.schema-panel,.toolbar,.history,.warning-msg,.debug-panel,.chart-suggest,.error-msg{display:none!important}
