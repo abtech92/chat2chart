@@ -285,11 +285,12 @@
 let providers=[], lastData=null, lastChartType='', lastDebug=null;
 let history=JSON.parse(localStorage.getItem('sqlviz_history')||'[]');
 const COLORS=['#00e5a0','#6c5ce7','#00d2ff','#ff6b6b','#ffd93d','#ff79c6','#a29bfe','#55efc4','#fd79a8','#74b9ff'];
+const BASE=(()=>{const p=window.location.pathname.replace(/\/$/,'');return p.endsWith('.html')||p==='/'||p===''?'':p})();
 loadDatabases(); loadProviders(); renderHistory();
 document.getElementById('question').addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();ask()}});
 
 async function loadDatabases(){
-    const dbs=await(await fetch('/api/databases')).json();
+    const dbs=await(await fetch(BASE+'/api/databases')).json();
     const s=document.getElementById('dbSelect');s.innerHTML='';
     dbs.forEach(db=>{const o=document.createElement('option');o.value=db.key;o.textContent=db.name;o.dataset.type=db.type;s.appendChild(o)});
     if(dbs.length>0)onDbChange();
@@ -297,7 +298,7 @@ async function loadDatabases(){
 async function onDbChange(){
     const s=document.getElementById('dbSelect'),opt=s.selectedOptions[0];if(!opt)return;
     const b=document.getElementById('dbBadge');b.textContent=opt.dataset.type;b.className='badge '+opt.dataset.type;
-    try{const t=await(await fetch(`/api/schema/${s.value}`)).json();renderSchema(t)}catch(e){}
+    try{const t=await(await fetch(`${BASE}/api/schema/${s.value}`)).json();renderSchema(t)}catch(e){}
 }
 function renderSchema(tables){
     const p=document.getElementById('schemaPanel'),b=document.getElementById('schemaBody');
@@ -308,7 +309,7 @@ function renderSchema(tables){
 function toggleSchema(){document.getElementById('schemaHeader').classList.toggle('open');document.getElementById('schemaBody').classList.toggle('open')}
 
 async function loadProviders(){
-    providers=await(await fetch('/api/providers')).json();
+    providers=await(await fetch(BASE+'/api/providers')).json();
     const s=document.getElementById('providerSelect');s.innerHTML='';
     if(!providers.length){document.getElementById('noProviderMsg').style.display='block';document.getElementById('askBtn').disabled=true;return}
     providers.forEach(p=>{const o=document.createElement('option');o.value=p.key;o.textContent=p.name;s.appendChild(o)});
@@ -388,7 +389,7 @@ async function ask(){
         setPipelineStep(1,'active','Reading tables...');await sleep(200);setPipelineStep(1,'done','Schema loaded');
         setPipelineStep(2,'active','AI is thinking...');
 
-        const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:llmQuestion,database:db,provider,model})});
+        const res=await fetch(BASE+'/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:llmQuestion,database:db,provider,model})});
         const data=await res.json();
         lastDebug=data.debug||{};
         if(!res.ok){
@@ -645,7 +646,7 @@ async function rerunSql(){
     const question=lastData?.question||'Manual SQL';
     document.getElementById('error').style.display='none';
     try{
-        const res=await fetch('/api/run-sql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql,database:db,question})});
+        const res=await fetch(BASE+'/api/run-sql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql,database:db,question})});
         const data=await res.json();
         if(!res.ok)throw new Error(data.error||'Query failed');
         lastData=data;
