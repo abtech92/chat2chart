@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat2Chart</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2300e5a0'/%3E%3Cstop offset='100%25' stop-color='%236c5ce7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M22 16V8a2 2 0 00-2-2H8a2 2 0 00-2 2v10' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M10 24l5-5 5 5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cline x1='15' y1='19' x2='15' y2='15' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a26;
+            --surface:#16161f;--surface2:#1e1e2a;--surface3:#252535;
+            --text:#e8e8ef;--text2:#9898aa;--text3:#5a5a70;
+            --border:#2a2a3a;--border2:#3a3a4d;
+            --accent:#00e5a0;--accent2:#00c896;--accent-glow:rgba(0,229,160,.15);
+            --accent-b:#6c5ce7;--accent-b-glow:rgba(108,92,231,.15);
+            --warm:#ff6b6b;--amber:#ffd93d;--cyan:#00d2ff;--pink:#ff79c6;
+            --mono:'Space Mono',monospace;
+            --sans:'DM Sans',system-ui,sans-serif;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        *::-webkit-scrollbar{width:6px;height:6px}
+        *::-webkit-scrollbar-track{background:transparent}
+        *::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+        *::-webkit-scrollbar-thumb:hover{background:#4a4a5d}
+        *{scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+        body{font-family:var(--sans);background:var(--bg);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased}
+
+        /* ---- HEADER ---- */
+        .header{padding:40px 24px 52px;text-align:center;position:relative;overflow:hidden}
+        .header::before{content:'';position:absolute;top:-60%;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(0,229,160,.06) 0%,rgba(108,92,231,.04) 40%,transparent 70%);pointer-events:none}
+        .header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),var(--accent),var(--border),transparent)}
+        .logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:8px;position:relative}
+        .logo-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-b));display:flex;align-items:center;justify-content:center}
+        .logo-icon svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}
+        .header h1{font-size:28px;font-weight:700;color:#fff;letter-spacing:-.03em;position:relative}
+        .header h1 span{background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-color:transparent;background-clip:text;color:transparent}
+        .header p{font-size:13px;color:var(--text3);margin-top:6px;position:relative;letter-spacing:.02em}
+
+        /* ---- SEARCH ---- */
+        .search-container{max-width:880px;margin:-28px auto 0;padding:0 16px;position:relative;z-index:10}
+        .search-box{background:var(--surface);border-radius:16px;border:1px solid var(--border);padding:20px;backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+        .config-row{display:flex;gap:12px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center}
+        .config-group{display:flex;align-items:center;gap:8px;flex:1;min-width:170px}
+        .config-group label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;white-space:nowrap;font-family:var(--mono)}
+        .config-group select{flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--bg2);color:var(--text);cursor:pointer;transition:all .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235a5a70'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+        .config-group select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+        .badge{font-size:9px;padding:3px 7px;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;font-family:var(--mono)}
+        .badge.sqlite{background:rgba(0,210,255,.12);color:var(--cyan)}.badge.postgres{background:rgba(0,229,160,.12);color:var(--accent)}.badge.mysql{background:rgba(255,217,61,.12);color:var(--amber)}
+        .badge.ollama{background:rgba(108,92,231,.15);color:#a29bfe}.badge.claude{background:rgba(255,121,198,.12);color:var(--pink)}.badge.openai{background:rgba(0,229,160,.12);color:var(--accent)}
+        .badge.gemini{background:rgba(0,210,255,.12);color:var(--cyan)}.badge.groq{background:rgba(255,217,61,.12);color:var(--amber)}
+        .input-row{display:flex;gap:12px;align-items:flex-start}
+        .input-row textarea{flex:1;border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:14px;font-family:var(--sans);resize:none;min-height:48px;max-height:140px;outline:none;color:var(--text);background:var(--bg2);transition:all .2s;line-height:1.4}
+        .input-row textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+        .input-row textarea::placeholder{color:var(--text3)}
+        .btn-primary{background:var(--accent);color:#0a0a0f;border:none;border-radius:10px;padding:14px 28px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s;font-family:var(--sans);letter-spacing:-.01em;position:relative;overflow:hidden}
+        .btn-primary::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.15) 50%,transparent 60%);transform:translateX(-100%);transition:transform .5s}
+        .btn-primary:hover{box-shadow:0 0 24px var(--accent-glow),0 0 48px rgba(0,229,160,.08);transform:translateY(-1px)}.btn-primary:hover::after{transform:translateX(100%)}
+        .btn-primary:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+
+        /* ---- CHIPS ---- */
+        .examples{max-width:880px;margin:14px auto 0;padding:0 16px;display:flex;gap:6px;flex-wrap:wrap}
+        .example-chip{background:transparent;border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;font-weight:500}
+        .example-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+
+        /* ---- PIPELINE ---- */
+        .pipeline{max-width:880px;margin:24px auto;padding:0 16px;display:none}
+        .pipeline-inner{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:24px}
+        .pipeline-steps{display:flex;gap:0;align-items:flex-start}
+        .pipeline-step{flex:1;text-align:center;position:relative}
+        .pipeline-step .step-icon{width:40px;height:40px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:13px;font-weight:700;transition:all .3s;color:var(--text3);cursor:pointer;border:1px solid var(--border);font-family:var(--mono)}
+        .pipeline-step .step-icon:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+        .pipeline-step.active .step-icon{background:var(--accent-b);color:#fff;border-color:var(--accent-b);animation:glow-pulse 2s ease-in-out infinite}
+        .pipeline-step.done .step-icon{background:var(--accent);color:#0a0a0f;border-color:var(--accent)}
+        .pipeline-step.error .step-icon{background:var(--warm);color:#fff;border-color:var(--warm)}
+        .pipeline-step .step-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+        .pipeline-step.active .step-label{color:var(--accent-b)}
+        .pipeline-step.done .step-label{color:var(--accent)}
+        .pipeline-step.error .step-label{color:var(--warm)}
+        .pipeline-step .step-detail{font-size:10px;color:var(--text3);margin-top:3px;min-height:14px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+        .pipeline-connector{width:100%;height:1px;background:var(--border);position:absolute;top:20px;left:50%;z-index:0}
+        .pipeline-step:last-child .pipeline-connector{display:none}
+        .pipeline-connector.done{background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
+        @keyframes glow-pulse{0%,100%{box-shadow:0 0 8px rgba(108,92,231,.3)}50%{box-shadow:0 0 20px rgba(108,92,231,.15)}}
+        .pipeline-info{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center;display:none}
+
+        /* ---- DEBUG ---- */
+        .debug-panel{max-width:880px;margin:0 auto;padding:0 16px}
+        .debug-card{background:var(--surface);border-radius:12px;margin-bottom:12px;overflow:hidden;border:1px solid var(--border)}
+        .debug-card-header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:var(--surface2)}
+        .debug-card-header:hover{background:var(--surface3)}
+        .debug-card-header h4{font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+        .debug-card-header .dur{font-size:11px;color:var(--text3);font-weight:400;font-family:var(--mono)}
+        .debug-card-body{border-top:1px solid var(--border)}
+        .debug-section{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.03)}
+        .debug-section:last-child{border-bottom:none}
+        .debug-section-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center;gap:6px;font-family:var(--mono)}
+        .debug-section-label.input{color:var(--cyan)}.debug-section-label.output{color:var(--accent)}
+        .debug-pre{background:var(--bg);color:var(--text2);padding:14px 16px;border-radius:8px;font-size:11px;font-family:var(--mono);overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow-y:auto;line-height:1.7;border:1px solid var(--border)}
+        .debug-badge{font-size:8px;padding:2px 6px;border-radius:3px;font-weight:700;letter-spacing:.5px;font-family:var(--mono)}
+        .debug-badge.step1{background:rgba(0,210,255,.12);color:var(--cyan)}.debug-badge.step2{background:rgba(108,92,231,.15);color:#a29bfe}
+        .debug-badge.step3{background:rgba(0,229,160,.12);color:var(--accent)}.debug-badge.step4{background:rgba(255,217,61,.12);color:var(--amber)}
+
+        /* ---- SCHEMA ---- */
+        .schema-panel{max-width:880px;margin:16px auto 0;padding:0 16px;display:none}
+        .schema-inner{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+        .schema-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:background .15s}
+        .schema-header:hover{background:var(--surface2)}
+        .schema-header h3{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}.schema-header .arrow{transition:transform .2s;font-size:12px;color:var(--text3)}
+        .schema-header.open .arrow{transform:rotate(180deg)}
+        .schema-body{display:none;padding:16px;max-height:300px;overflow-y:auto;border-top:1px solid var(--border)}.schema-body.open{display:block}
+        .schema-table{margin-bottom:16px}
+        .schema-table-name{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:8px;font-family:var(--mono)}
+        .schema-table-name .count{font-weight:400;color:var(--text3);font-size:10px}
+        .schema-cols{display:flex;flex-wrap:wrap;gap:4px}
+        .schema-col{font-size:10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;color:var(--text2);font-family:var(--mono)}
+        .schema-col .col-type{color:var(--text3);margin-left:3px}
+
+        /* ---- MESSAGES ---- */
+        .error-msg{max-width:880px;margin:16px auto;padding:0 16px;display:none}
+        .error-msg .inner{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:10px;padding:14px 16px;color:var(--warm);font-size:13px;font-weight:500}
+        .chart-suggest{max-width:1100px;margin:0 auto 12px;padding:0 16px}
+        .chart-suggest .inner{background:rgba(255,217,61,.06);border:1px solid rgba(255,217,61,.2);border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .chart-suggest .msg{font-size:13px;color:var(--amber);font-weight:500;flex:1}
+        .chart-suggest .msg strong{color:var(--text)}
+        .chart-suggest .suggest-btn{background:var(--amber);color:#0a0a0f;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);transition:all .2s;white-space:nowrap}
+        .chart-suggest .suggest-btn:hover{box-shadow:0 0 16px rgba(255,217,61,.3)}
+        .warning-msg{max-width:880px;margin:20px auto;padding:0 16px;display:none}
+        .warning-msg .inner{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;text-align:center}
+        .warning-msg h3{color:var(--amber);margin-bottom:8px;font-size:16px;font-weight:700}
+        .warning-msg p{font-size:13px;color:var(--text2);line-height:1.6}
+        .warning-msg code{background:var(--bg2);padding:3px 8px;border-radius:5px;font-size:11px;font-family:var(--mono);color:var(--accent);border:1px solid var(--border)}
+        .setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px;text-align:left}
+        .setup-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;transition:all .2s}
+        .setup-card:hover{border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+        .setup-card h4{font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+        .setup-card p{font-size:11px;color:var(--text3);margin:0;line-height:1.5}
+
+        /* ---- RESULTS ---- */
+        .results-area{max-width:1100px;margin:24px auto;padding:0 16px;display:none}
+        .toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+        .toolbar-left{display:flex;align-items:center;gap:10px}.toolbar-right{display:flex;gap:8px}
+        .toolbar-btn{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .2s;font-family:var(--sans)}
+        .toolbar-btn:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+        .toolbar-btn.active{background:var(--accent);color:#0a0a0f;border-color:var(--accent)}
+        .toolbar-btn svg{width:14px;height:14px}
+        .row-badge{font-size:11px;color:var(--text3);font-weight:500;font-family:var(--mono)}
+        .sql-panel{background:var(--bg);border-radius:12px;padding:18px 20px;margin-bottom:16px;display:none;position:relative;border:1px solid var(--border)}
+        .sql-panel textarea{width:100%;background:transparent;color:var(--accent);font-size:12px;font-family:var(--mono);border:none;outline:none;resize:vertical;min-height:60px;line-height:1.7;padding:0;padding-right:120px}
+        .sql-panel .sql-actions{position:absolute;top:12px;right:12px;display:flex;gap:6px}
+        .sql-panel .sql-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text3);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;font-family:var(--mono);transition:all .2s;text-transform:uppercase;letter-spacing:.5px}
+        .sql-panel .sql-btn:hover{border-color:var(--accent);color:var(--accent)}
+        .sql-panel .sql-btn.rerun{background:var(--accent);color:#0a0a0f;border-color:var(--accent)}
+        .sql-panel .sql-btn.rerun:hover{box-shadow:0 0 12px var(--accent-glow)}
+        .chart-container{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:28px;margin-bottom:16px;position:relative;overflow:hidden}
+        .chart-container::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.3}
+        .chart-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-.02em}
+        .chart-subtitle{font-size:12px;color:var(--text3);margin-bottom:20px}
+        .chart-type-label{display:inline-block;font-size:9px;padding:3px 10px;border-radius:4px;background:rgba(108,92,231,.12);color:#a29bfe;font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono)}
+        #chart{width:100%;min-height:350px}
+        .data-table-container{background:var(--surface);border-radius:12px;overflow:hidden;margin-bottom:16px;border:1px solid var(--border)}
+        .data-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+        .data-table thead{background:var(--surface2)}
+        .data-table th{padding:10px 14px;text-align:left;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;font-family:var(--mono)}
+        .data-table td{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text2);font-family:var(--mono);font-size:12px}
+        .data-table tbody tr:hover{background:var(--accent-glow)}
+        .data-table tbody tr:nth-child(even){background:rgba(255,255,255,.01)}
+        .data-table-scroll{max-height:400px;overflow-y:auto}
+
+        /* ---- HISTORY ---- */
+        .history{max-width:880px;margin:24px auto;padding:0 16px 30px}
+        .history h3{font-size:10px;color:var(--text3);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;font-weight:700;font-family:var(--mono)}
+        .history-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:6px;font-size:13px;color:var(--text);cursor:pointer;transition:all .2s;display:flex;justify-content:space-between;align-items:center;font-weight:500}
+        .history-item:hover{border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}.history-item .meta{font-size:10px;color:var(--text3);font-family:var(--mono)}
+
+        /* ---- TOOLTIP ---- */
+        .d3-tooltip{position:absolute;background:var(--surface2);color:var(--text);padding:10px 14px;border-radius:8px;font-size:12px;font-weight:500;pointer-events:none;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid var(--border);font-family:var(--sans);line-height:1.5;backdrop-filter:blur(12px)}
+
+        /* ---- ANIMATIONS ---- */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .search-box{animation:fadeUp .5s ease-out}
+        .example-chip{animation:fadeUp .5s ease-out;animation-fill-mode:both}
+        .example-chip:nth-child(1){animation-delay:.1s}.example-chip:nth-child(2){animation-delay:.15s}.example-chip:nth-child(3){animation-delay:.2s}.example-chip:nth-child(4){animation-delay:.25s}.example-chip:nth-child(5){animation-delay:.3s}
+
+        @media(max-width:640px){.config-row{flex-direction:column}.pipeline-steps{flex-direction:column;gap:8px}.pipeline-connector{display:none!important}}
+        @media print{
+            body{background:#fff!important;color:#0f172a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            .header,.search-container,.examples,.pipeline,.schema-panel,.toolbar,.history,.warning-msg,.debug-panel,.chart-suggest,.error-msg{display:none!important}
+            .results-area{display:block!important;margin:0!important;padding:20px!important;max-width:100%!important}
+            .sql-panel{display:none!important}
+            .chart-container{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid;background:#fff!important;margin-bottom:20px!important;page-break-inside:avoid}
+            .chart-container *{color:#0f172a!important}
+            .chart-container .chart-subtitle{color:#64748b!important}
+            .data-table-container{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid;background:#fff!important;page-break-inside:avoid}
+            .data-table th{background:#f8fafc!important;color:#475569!important;border-color:#e2e8f0!important}
+            .data-table td{color:#0f172a!important;border-color:#e2e8f0!important}
+            .data-table tbody tr:nth-child(even){background:#f8fafc!important}
+            .data-table-scroll{max-height:none!important;overflow:visible!important}
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M21 15V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10"/><path d="M7 21l5-5 5 5"/><line x1="12" y1="16" x2="12" y2="12"/></svg></div>
+            <h1>Chat2<span>Chart</span></h1>
+        </div>
+        <p>Ask questions about your data in plain English</p>
+    </div>
+
+    <div class="search-container"><div class="search-box">
+        <div class="config-row">
+            <div class="config-group"><label>Database</label><select id="dbSelect" onchange="onDbChange()"></select><span class="badge" id="dbBadge"></span></div>
+            <div class="config-group"><label>AI</label><select id="providerSelect" onchange="onProviderChange()"></select><span class="badge" id="providerBadge"></span></div>
+            <div class="config-group"><label>Model</label><select id="modelSelect"></select></div>
+        </div>
+        <div class="input-row">
+            <textarea id="question" rows="1" placeholder='Ask anything... e.g. "Show me monthly revenue trends"' oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+            <button class="btn-primary" id="askBtn" onclick="ask()">Visualize</button>
+        </div>
+    </div></div>
+
+    <div class="examples">
+        <span class="example-chip" onclick="useExample(this)">Churn rate by month</span>
+        <span class="example-chip" onclick="useExample(this)">Top 10 customers by total spend</span>
+        <span class="example-chip" onclick="useExample(this)">Monthly revenue trend</span>
+        <span class="example-chip" onclick="useExample(this)">Orders by category</span>
+        <span class="example-chip" onclick="useExample(this)">User signups by plan</span>
+    </div>
+
+    <div class="schema-panel" id="schemaPanel"><div class="schema-inner">
+        <div class="schema-header" id="schemaHeader" onclick="toggleSchema()"><h3>Database Schema</h3><span class="arrow">&#9660;</span></div>
+        <div class="schema-body" id="schemaBody"></div>
+    </div></div>
+
+    <div class="pipeline" id="pipeline"><div class="pipeline-inner">
+        <div class="pipeline-steps">
+            <div class="pipeline-step" id="step1"><div class="pipeline-connector" id="conn1"></div><div class="step-icon" onclick="toggleDebug(1)">1</div><div class="step-label">Read Schema</div><div class="step-detail" id="step1Detail"></div></div>
+            <div class="pipeline-step" id="step2"><div class="pipeline-connector" id="conn2"></div><div class="step-icon" onclick="toggleDebug(2)">2</div><div class="step-label">Generate SQL</div><div class="step-detail" id="step2Detail"></div></div>
+            <div class="pipeline-step" id="step3"><div class="pipeline-connector" id="conn3"></div><div class="step-icon" onclick="toggleDebug(3)">3</div><div class="step-label">Run Query</div><div class="step-detail" id="step3Detail"></div></div>
+            <div class="pipeline-step" id="step4"><div class="step-icon" onclick="toggleDebug(4)">4</div><div class="step-label">Visualize</div><div class="step-detail" id="step4Detail"></div></div>
+        </div>
+        <div class="pipeline-info" id="pipelineInfo"></div>
+    </div></div>
+
+    <div class="debug-panel" id="debugPanel"></div>
+
+    <div class="warning-msg" id="noProviderMsg"><div class="inner">
+        <h3>No AI Provider Configured</h3><p>Add at least one to your <code>.env</code> file:</p>
+        <div class="setup-grid">
+            <div class="setup-card"><h4><span class="badge groq">FREE</span> Groq</h4><p><code>GROQ_API_KEY=...</code><br>Free, fast, runs Llama 70B</p></div>
+            <div class="setup-card"><h4><span class="badge ollama">FREE</span> Ollama</h4><p><code>OLLAMA_URL=http://localhost:11434</code></p></div>
+            <div class="setup-card"><h4><span class="badge gemini">FREE</span> Gemini</h4><p><code>GEMINI_API_KEY=...</code></p></div>
+            <div class="setup-card"><h4><span class="badge claude">$</span> Claude</h4><p><code>ANTHROPIC_API_KEY=...</code></p></div>
+        </div>
+    </div></div>
+
+    <div class="error-msg" id="error"><div class="inner" id="errorText"></div></div>
+
+    <!-- Chart suggestion banner (when requested chart type doesn't fit the data) -->
+    <div class="chart-suggest" id="chartSuggest" style="display:none"></div>
+
+    <div class="results-area" id="resultsArea">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button class="toolbar-btn" id="sqlToggle" onclick="toggleSql()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/></svg>SQL</button>
+                <span class="row-badge" id="rowBadge"></span>
+                <span class="chart-type-label" id="chartTypeLabel"></span>
+            </div>
+            <div class="toolbar-right">
+                <button class="toolbar-btn" onclick="downloadHtml()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download HTML</button>
+                <button class="toolbar-btn" onclick="downloadPdf()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>PDF</button>
+            </div>
+        </div>
+        <div class="sql-panel" id="sqlPanel"><div class="sql-actions"><button class="sql-btn" onclick="copySql()">COPY</button><button class="sql-btn rerun" onclick="rerunSql()">RE-RUN</button></div><textarea id="sqlCode" spellcheck="false"></textarea></div>
+        <div class="chart-container" id="chartContainer"><div class="chart-title" id="chartTitle"></div><div class="chart-subtitle" id="chartSubtitle"></div><div id="chart"></div></div>
+        <div class="data-table-container"><div class="data-table-scroll"><table class="data-table" id="dataTable"><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div></div>
+    </div>
+
+    <div class="history" id="historySection" style="display:none"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Recent Queries</h3><button onclick="clearHistory()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;transition:all .2s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">Clear All</button></div><div id="historyList"></div></div>
+    <div class="d3-tooltip" id="tooltip" style="display:none"></div>
+
+<script>
+let providers=[], lastData=null, lastChartType='', lastDebug=null;
+let history=JSON.parse(localStorage.getItem('sqlviz_history')||'[]');
+const COLORS=['#00e5a0','#6c5ce7','#00d2ff','#ff6b6b','#ffd93d','#ff79c6','#a29bfe','#55efc4','#fd79a8','#74b9ff'];
+loadDatabases(); loadProviders(); renderHistory();
+document.getElementById('question').addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();ask()}});
+
+async function loadDatabases(){
+    const dbs=await(await fetch('/api/databases')).json();
+    const s=document.getElementById('dbSelect');s.innerHTML='';
+    dbs.forEach(db=>{const o=document.createElement('option');o.value=db.key;o.textContent=db.name;o.dataset.type=db.type;s.appendChild(o)});
+    if(dbs.length>0)onDbChange();
+}
+async function onDbChange(){
+    const s=document.getElementById('dbSelect'),opt=s.selectedOptions[0];if(!opt)return;
+    const b=document.getElementById('dbBadge');b.textContent=opt.dataset.type;b.className='badge '+opt.dataset.type;
+    try{const t=await(await fetch(`/api/schema/${s.value}`)).json();renderSchema(t)}catch(e){}
+}
+function renderSchema(tables){
+    const p=document.getElementById('schemaPanel'),b=document.getElementById('schemaBody');
+    if(!tables||!Object.keys(tables).length){p.style.display='none';return}
+    p.style.display='block';
+    b.innerHTML=Object.entries(tables).map(([n,i])=>`<div class="schema-table"><div class="schema-table-name">${n}<span class="count">${i.row_count?i.row_count.toLocaleString()+' rows':''}</span></div><div class="schema-cols">${i.columns.map(c=>`<span class="schema-col">${c.name}<span class="col-type">${c.type}</span></span>`).join('')}</div></div>`).join('');
+}
+function toggleSchema(){document.getElementById('schemaHeader').classList.toggle('open');document.getElementById('schemaBody').classList.toggle('open')}
+
+async function loadProviders(){
+    providers=await(await fetch('/api/providers')).json();
+    const s=document.getElementById('providerSelect');s.innerHTML='';
+    if(!providers.length){document.getElementById('noProviderMsg').style.display='block';document.getElementById('askBtn').disabled=true;return}
+    providers.forEach(p=>{const o=document.createElement('option');o.value=p.key;o.textContent=p.name;s.appendChild(o)});
+    onProviderChange();
+}
+function onProviderChange(){
+    const k=document.getElementById('providerSelect').value,p=providers.find(x=>x.key===k);if(!p)return;
+    const pb=document.getElementById('providerBadge');pb.textContent=k;pb.className='badge '+k;
+    const m=document.getElementById('modelSelect');m.innerHTML='';
+    p.models.forEach(mod=>{const o=document.createElement('option');o.value=mod.id;o.textContent=mod.name;if(mod.id===p.default_model)o.selected=true;m.appendChild(o)});
+}
+function useExample(el){const q=document.getElementById('question');q.value=el.textContent;q.style.height='auto';q.style.height=q.scrollHeight+'px';q.focus()}
+
+function setPipelineStep(n,state,detail){
+    for(let i=1;i<=4;i++){const s=document.getElementById('step'+i),d=document.getElementById('step'+i+'Detail'),c=document.getElementById('conn'+i);
+        s.className='pipeline-step';if(i<n){s.classList.add('done');if(c)c.classList.add('done')}else if(i===n)s.classList.add(state);
+        if(i===n&&detail)d.textContent=detail}
+}
+function resetPipeline(){for(let i=1;i<=4;i++){document.getElementById('step'+i).className='pipeline-step';document.getElementById('step'+i+'Detail').textContent='';const c=document.getElementById('conn'+i);if(c)c.classList.remove('done')}document.getElementById('debugPanel').innerHTML='';lastDebug=null}
+
+function toggleDebug(stepNum){
+    if(!lastDebug)return;
+    const panel=document.getElementById('debugPanel');
+    const stepKey={1:'step1_schema',2:'step2_llm',3:'step3_query',4:'step4_chart'}[stepNum];
+    const data=stepNum===4?lastDebug._step4:lastDebug[stepKey];
+    if(!data){panel.innerHTML='';return}
+    if(panel.dataset.showing===String(stepNum)){panel.innerHTML='';panel.dataset.showing='';return}
+    panel.dataset.showing=String(stepNum);
+
+    if(stepNum===1)panel.innerHTML=renderDebugCard('Step 1: Read Schema','step1',data.duration_ms,
+        [{label:'INPUT',type:'input',content:data.input}],
+        [{label:'OUTPUT \u2014 Database Schema',type:'output',content:data.output}]);
+    else if(stepNum===2)panel.innerHTML=renderDebugCard('Step 2: Generate SQL','step2',data.duration_ms,
+        [{label:`INPUT \u2014 Prompt sent to ${data.provider}/${data.model}`,type:'input',content:data.input}],
+        [{label:'OUTPUT \u2014 Raw LLM Response',type:'output',content:data.output},{label:'OUTPUT \u2014 Cleaned SQL',type:'output',content:data.sql_cleaned}]);
+    else if(stepNum===3)panel.innerHTML=renderDebugCard('Step 3: Run Query','step3',data.duration_ms,
+        [{label:'INPUT \u2014 SQL Query',type:'input',content:data.input}],
+        [{label:`OUTPUT \u2014 ${data.output_row_count} rows, columns: [${data.output_columns.join(', ')}]`,type:'output',content:JSON.stringify(data.output_sample,null,2)}]);
+    else if(stepNum===4)panel.innerHTML=renderDebugCard('Step 4: Visualize (D3.js)','step4',data.duration_ms,
+        [{label:`INPUT \u2014 ${data.row_count} rows, ${data.col_count} columns`,type:'input',content:`Columns: ${data.columns.join(', ')}\nColumn types detected:\n${data.col_analysis}`}],
+        [{label:`OUTPUT \u2014 Chart type: ${data.chart_type}`,type:'output',content:`Reason: ${data.chart_reason}\n\nChart selection logic:\n${data.decision_log}`}]);
+}
+
+function renderDebugCard(title,stepClass,durationMs,inputs,outputs){
+    const sections=[...inputs.map(s=>`<div class="debug-section"><div class="debug-section-label input">\u25b6 ${s.label}</div><div class="debug-pre">${escHtml(s.content)}</div></div>`),
+        ...outputs.map(s=>`<div class="debug-section"><div class="debug-section-label output">\u25c0 ${s.label}</div><div class="debug-pre">${escHtml(s.content)}</div></div>`)];
+    return `<div class="debug-card"><div class="debug-card-header"><h4><span class="debug-badge ${stepClass}">${stepClass.toUpperCase()}</span>${title}<span class="dur">${durationMs}ms</span></h4></div><div class="debug-card-body">${sections.join('')}</div></div>`;
+}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// Strip chart-type keywords from question before sending to LLM
+// so the LLM focuses on the DATA query, not the visualization
+function stripChartKeywords(q){
+    return q.replace(/\b(as a?|in a?|using a?|show (?:as|in|with) a?|display (?:as|in) a?)\s*(line chart|line graph|bar chart|bar graph|column chart|pie chart|pie graph|donut chart|donut graph|doughnut|scatter plot|scatter chart|scatter graph|histogram|bubble chart|stat card|kpi|data table|table view)\b/gi,'')
+            .replace(/\b(line chart|line graph|bar chart|bar graph|column chart|pie chart|pie graph|donut chart|donut graph|doughnut|scatter plot|scatter chart|scatter graph|histogram|bubble chart|stat card|kpi)\b/gi,'')
+            .replace(/\s{2,}/g,' ').trim();
+}
+
+async function ask(){
+    const question=document.getElementById('question').value.trim();if(!question)return;
+    document.getElementById('error').style.display='none';document.getElementById('resultsArea').style.display='none';
+    document.getElementById('pipeline').style.display='block';document.getElementById('askBtn').disabled=true;
+    resetPipeline();lastData=null;
+
+    const db=document.getElementById('dbSelect').value,provider=document.getElementById('providerSelect').value,model=document.getElementById('modelSelect').value;
+    const dbName=document.getElementById('dbSelect').selectedOptions[0]?.textContent||db;
+    const providerName=document.getElementById('providerSelect').selectedOptions[0]?.textContent||provider;
+    const info=document.getElementById('pipelineInfo');
+    info.style.display='block';
+    info.innerHTML=`<strong>DB:</strong> ${dbName} &nbsp;\u00b7&nbsp; <strong>Provider:</strong> ${providerName} &nbsp;\u00b7&nbsp; <strong>Model:</strong> <code style="background:var(--bg2);padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);color:var(--accent);border:1px solid var(--border)">${model}</code> &nbsp;\u00b7&nbsp; <span style="color:var(--text3)">Click any step number to see input/output</span>`;
+    const startTime=Date.now();
+
+    // Strip chart keywords before sending to LLM — keep original for chart detection
+    const llmQuestion=stripChartKeywords(question);
+
+    try{
+        setPipelineStep(1,'active','Reading tables...');await sleep(200);setPipelineStep(1,'done','Schema loaded');
+        setPipelineStep(2,'active','AI is thinking...');
+
+        const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:llmQuestion,database:db,provider,model})});
+        const data=await res.json();
+        lastDebug=data.debug||{};
+        if(!res.ok){
+            if(lastDebug.step2_llm&&!lastDebug.step3_query){setPipelineStep(2,'done',`SQL generated (${lastDebug.step2_llm?.duration_ms||0}ms)`);setPipelineStep(3,'error','Failed')}
+            else if(!lastDebug.step2_llm){setPipelineStep(2,'error','Failed')}
+            else{setPipelineStep(2,'done','Done');setPipelineStep(3,'error','Failed')}
+            throw new Error(data.error||'Something went wrong');
+        }
+        const attempts=lastDebug.step2_llm?.attempts||1;
+        const retryLabel=attempts>1?` (${attempts} attempts)`:'';
+        setPipelineStep(2,'done',`SQL generated${retryLabel} (${lastDebug.step2_llm?.duration_ms||0}ms)`);
+        setPipelineStep(3,'active','Fetching results...');await sleep(150);
+        setPipelineStep(3,'done',`${data.row_count} rows (${lastDebug.step3_query?.duration_ms||0}ms)`);
+        setPipelineStep(4,'active','Building chart...');await sleep(150);
+
+        // Use original question (with chart keywords) for chart detection
+        data.question=question;
+        lastData=data;
+        const chartInfo=renderResults(data);
+        const elapsed=((Date.now()-startTime)/1000).toFixed(1);
+        setPipelineStep(4,'done',`Done in ${elapsed}s`);
+
+        const colTypes=data.columns.map(c=>analyzeColumn(c,data.rows));
+        lastDebug._step4={
+            duration_ms:Math.round(Date.now()-startTime)-(lastDebug.step2_llm?.duration_ms||0)-(lastDebug.step3_query?.duration_ms||0),
+            row_count:data.row_count, col_count:data.columns.length, columns:data.columns,
+            col_analysis:colTypes.map(c=>`  ${c.name}: ${c.isDate?'DATE':c.isNumeric?'NUMERIC':c.isCategorical?'CATEGORICAL':'OTHER'} (${c.uniqueCount} unique values)`).join('\n'),
+            chart_type:chartInfo.type, chart_reason:chartInfo.reason,
+            decision_log:`1. Columns analyzed: ${data.columns.length}\n2. Date columns: ${colTypes.filter(c=>c.isDate).map(c=>c.name).join(', ')||'none'}\n3. Numeric columns: ${colTypes.filter(c=>c.isNumeric).map(c=>c.name).join(', ')||'none'}\n4. Categorical columns: ${colTypes.filter(c=>c.isCategorical).map(c=>c.name).join(', ')||'none'}\n5. Row count: ${data.row_count}\n6. Decision: ${chartInfo.reason}`
+        };
+
+        history.unshift({question,database:db,model,rows:data.row_count||0,time:new Date().toLocaleString()});
+        if(history.length>20)history.pop();localStorage.setItem('sqlviz_history',JSON.stringify(history));renderHistory();
+    }catch(err){document.getElementById('errorText').textContent=err.message;document.getElementById('error').style.display='block'}
+    finally{document.getElementById('askBtn').disabled=false}
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+function renderResults(data){
+    document.getElementById('resultsArea').style.display='block';
+    document.getElementById('sqlCode').value=data.sql;autoResizeSql();
+    document.getElementById('rowBadge').textContent=`${data.row_count} rows`;
+    renderTable(data.columns,data.rows);
+
+    // Handle empty results
+    if(!data.rows.length){
+        const chartEl=document.getElementById('chart');
+        document.getElementById('chartTypeLabel').textContent='no data';
+        document.getElementById('chartTitle').textContent=data.question;
+        document.getElementById('chartSubtitle').textContent='';
+        chartEl.innerHTML=`<div style="text-align:center;padding:60px 20px"><div style="font-size:40px;margin-bottom:12px;opacity:.3">0</div><div style="font-size:14px;color:var(--text3);font-weight:500">Query returned no results</div><div style="font-size:12px;color:var(--text3);margin-top:6px;opacity:.6">Try rephrasing your question or check the SQL</div></div>`;
+        document.getElementById('chartSuggest').style.display='none';
+        lastChartType='none';
+        return{type:'none',reason:'No data'};
+    }
+
+    // Check if user requested a specific chart type
+    const requestedType=parseRequestedChart(data.question);
+    const ci=detectChartType(data.columns,data.rows,requestedType);
+    lastChartType=ci.type;
+
+    // Show suggestion banner if requested chart type didn't work
+    const suggestEl=document.getElementById('chartSuggest');
+    if(ci.requestedFailed){
+        const chartNames={line:'Line Chart',bar:'Bar Chart',donut:'Donut/Pie Chart',scatter:'Scatter Plot',stat:'Stat Card',table:'Table'};
+        suggestEl.style.display='block';
+        suggestEl.innerHTML=`<div class="inner"><div class="msg">${ci.failReason}. Showing as <strong>${chartNames[ci.type]||ci.type}</strong> instead.</div><button class="suggest-btn" onclick="acceptSuggestion()">Got it</button></div>`;
+    } else {
+        suggestEl.style.display='none';
+    }
+
+    document.getElementById('chartTypeLabel').textContent=ci.type+' chart';
+    document.getElementById('chartTitle').textContent=data.question;
+    document.getElementById('chartSubtitle').textContent=ci.wasRequested?`Requested: ${ci.type} chart`:ci.reason;
+
+    // For donut with too many rows, group into top 8 + Other
+    let chartRows=data.rows;
+    if(ci.type==='donut'&&data.rows.length>8&&ci.numCols.length>=1){
+        const vk=ci.numCols[0].name;
+        const ck=ci.catCols.length?ci.catCols[0].name:data.columns[0];
+        const sorted=[...data.rows].sort((a,b)=>(+b[vk])-(+a[vk]));
+        const top8=sorted.slice(0,8);
+        const otherSum=sorted.slice(8).reduce((s,r)=>s+(+r[vk]),0);
+        if(otherSum>0)top8.push({[ck]:'Other',[vk]:otherSum});
+        chartRows=top8;
+    }
+
+    renderChart(ci,data.columns,chartRows);
+    return ci;
+}
+function acceptSuggestion(){document.getElementById('chartSuggest').style.display='none'}
+function renderTable(cols,rows){
+    document.getElementById('tableHead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+    document.getElementById('tableBody').innerHTML=rows.slice(0,200).map(r=>'<tr>'+cols.map(c=>`<td>${fmtCell(r[c])}</td>`).join('')+'</tr>').join('');
+}
+function fmtCell(v){if(v===null||v===undefined)return'<span style="color:var(--text3)">null</span>';if(typeof v==='number')return v.toLocaleString();return String(v)}
+
+// --- Parse user-requested chart type from question ---
+function parseRequestedChart(question){
+    const q=question.toLowerCase();
+    const patterns=[
+        {type:'line',keywords:['line chart','line graph','trend line','time series']},
+        {type:'bar',keywords:['bar chart','bar graph','column chart','histogram']},
+        {type:'donut',keywords:['donut chart','donut graph','doughnut','pie chart','pie graph']},
+        {type:'scatter',keywords:['scatter plot','scatter chart','scatter graph','correlation chart','bubble chart']},
+        {type:'stat',keywords:['stat card','single number','kpi','metric card']},
+        {type:'table',keywords:['table','tabular','grid view','data table']},
+    ];
+    for(const p of patterns){
+        if(p.keywords.some(k=>q.includes(k)))return p.type;
+    }
+    // Also check shorthand: "as a bar", "in a pie", "show as line"
+    const shorthand=/(?:as a?|in a?|using a?|show (?:as|in|with) a?)\s*(line|bar|pie|donut|doughnut|scatter|table)/i.exec(question);
+    if(shorthand){
+        const m=shorthand[1].toLowerCase();
+        if(m==='pie'||m==='doughnut')return 'donut';
+        if(['line','bar','scatter','table'].includes(m))return m;
+    }
+    return null; // no specific chart requested
+}
+
+// --- Check if data can be rendered as a specific chart type ---
+function canRenderAs(type,colTypes){
+    const dc=colTypes.find(c=>c.isDate),nc=colTypes.filter(c=>c.isNumeric),cc=colTypes.filter(c=>c.isCategorical);
+    const reasons={
+        line:dc&&nc.length>=1?null:'Line chart needs a date/time column and at least 1 numeric column',
+        bar:nc.length>=1?null:'Bar chart needs at least 1 numeric column',
+        donut:(cc.length>=1&&nc.length>=1)?null:'Donut/pie chart needs 1 categorical column and 1 numeric column',
+        scatter:nc.length>=2?null:'Scatter plot needs at least 2 numeric columns',
+        stat:nc.length>=1?null:'Stat card needs at least 1 numeric value',
+        table:null, // table always works
+    };
+    return {possible:!reasons[type],reason:reasons[type]};
+}
+
+function detectChartType(cols,rows,requestedType){
+    if(!rows.length||!cols.length)return{type:'table',reason:'No data'};
+    const ct=cols.map(c=>analyzeColumn(c,rows));
+    const dc=ct.find(c=>c.isDate),nc=ct.filter(c=>c.isNumeric),cc=ct.filter(c=>c.isCategorical);
+
+    // If user requested a specific chart type, try to use it
+    if(requestedType){
+        const check=canRenderAs(requestedType,ct);
+        if(check.possible){
+            // Build the info object for the requested type
+            const info={type:requestedType,reason:`Requested: ${requestedType} chart`,dateCol:dc,numCols:nc,catCols:cc,wasRequested:true};
+            // Special handling: donut with too many rows — group into top N + Other
+            if(requestedType==='donut'&&rows.length>10)info.reason=`Requested: donut chart (showing top 8 + Other)`;
+            return info;
+        }
+        // Can't render as requested — auto-detect best and flag it
+        const auto=autoDetect(ct,dc,nc,cc,rows);
+        auto.requestedType=requestedType;
+        auto.requestedFailed=true;
+        auto.failReason=check.reason;
+        return auto;
+    }
+
+    return autoDetect(ct,dc,nc,cc,rows);
+}
+
+function autoDetect(ct,dc,nc,cc,rows){
+    if(rows.length===1&&nc.length>=1)return{type:'stat',reason:'Single result \u2014 stat card',dateCol:dc,numCols:nc,catCols:cc};
+    if(dc&&nc.length>=1)return{type:'line',reason:`Time series: "${dc.name}" over time`,dateCol:dc,numCols:nc,catCols:cc};
+    if(cc.length>=1&&nc.length===1&&rows.length<=8)return{type:'donut',reason:`Proportions: "${nc[0].name}" by "${cc[0].name}"`,dateCol:dc,numCols:nc,catCols:cc};
+    if(cc.length>=1&&nc.length>=1)return{type:'bar',reason:`Comparison: "${nc[0].name}" by "${cc[0].name}"`,dateCol:dc,numCols:nc,catCols:cc};
+    if(nc.length>=2&&cc.length===0)return{type:'scatter',reason:`Correlation: "${nc[0].name}" vs "${nc[1].name}"`,dateCol:dc,numCols:nc,catCols:cc};
+    if(nc.length>=1)return{type:'bar',reason:'Numeric data as bars',dateCol:dc,numCols:nc,catCols:cc};
+    return{type:'table',reason:'Best as table',dateCol:dc,numCols:nc,catCols:cc};
+}
+function analyzeColumn(col,rows){
+    const vals=rows.map(r=>r[col]).filter(v=>v!=null),s=vals.slice(0,50);
+    const isNumeric=s.length>0&&s.every(v=>typeof v==='number'||(!isNaN(Number(v))&&String(v).trim()!==''));
+    const isDate=!isNumeric&&s.length>0&&s.every(v=>{const st=String(v);return/^\d{4}-\d{2}/.test(st)||/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(st)||(!isNaN(Date.parse(st))&&st.length>6)});
+    const unique=new Set(s.map(String)).size;
+    return{name:col,isNumeric,isDate,isCategorical:!isNumeric&&!isDate&&unique<=Math.min(50,s.length),uniqueCount:unique};
+}
+
+function renderChart(info,cols,rows){const c=document.getElementById('chart');c.innerHTML='';
+    if(info.type==='stat')renderStatCard(c,cols,rows);
+    else if(info.type==='line')renderLineChart(c,info,rows);
+    else if(info.type==='bar')renderBarChart(c,info,rows);
+    else if(info.type==='donut')renderDonutChart(c,info,rows);
+    else if(info.type==='scatter')renderScatterChart(c,info,rows);
+}
+function renderStatCard(c,cols,rows){const r=rows[0];c.innerHTML=cols.map((col,i)=>{const v=r[col];return`<div style="text-align:center;padding:36px"><div style="font-size:48px;font-weight:700;color:${COLORS[i%COLORS.length]};letter-spacing:-.03em;font-family:var(--sans);text-shadow:0 0 40px ${COLORS[i%COLORS.length]}33">${typeof v==='number'?v.toLocaleString():v}</div><div style="font-size:10px;color:var(--text3);margin-top:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">${col}</div></div>`}).join('')}
+function renderLineChart(c,info,rows){
+    const m={top:20,right:30,bottom:60,left:60},w=c.clientWidth-m.left-m.right,h=320-m.top-m.bottom,tt=d3.select('#tooltip');
+    const svg=d3.select(c).append('svg').attr('width',w+m.left+m.right).attr('height',h+m.top+m.bottom).append('g').attr('transform',`translate(${m.left},${m.top})`);
+    const dk=info.dateCol.name,parsed=rows.map(r=>({...r,_d:new Date(r[dk])})).sort((a,b)=>a._d-b._d);
+    const x=d3.scaleTime().domain(d3.extent(parsed,d=>d._d)).range([0,w]);
+    const nk=info.numCols.map(c=>c.name),av=parsed.flatMap(r=>nk.map(k=>+r[k]));
+    const y=d3.scaleLinear().domain([Math.min(0,d3.min(av)),d3.max(av)*1.1]).range([h,0]);
+    svg.append('g').call(d3.axisLeft(y).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','rgba(255,255,255,.04)');svg.selectAll('.domain').remove();
+    svg.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x).ticks(6)).selectAll('text').attr('fill','#5a5a70').style('font-size','10px').style('font-family','Space Mono,monospace');
+    svg.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('~s'))).selectAll('text').attr('fill','#5a5a70').style('font-size','10px').style('font-family','Space Mono,monospace');
+    nk.forEach((key,i)=>{
+        const area=d3.area().x(d=>x(d._d)).y0(h).y1(d=>y(+d[key])).curve(d3.curveMonotoneX);
+        svg.append('path').datum(parsed).attr('d',area).attr('fill',COLORS[i]).attr('opacity',.08);
+        svg.append('path').datum(parsed).attr('d',d3.line().x(d=>x(d._d)).y(d=>y(+d[key])).curve(d3.curveMonotoneX)).attr('fill','none').attr('stroke',COLORS[i]).attr('stroke-width',2.5);
+        svg.selectAll(`.dot${i}`).data(parsed).join('circle').attr('cx',d=>x(d._d)).attr('cy',d=>y(+d[key])).attr('r',3.5).attr('fill',COLORS[i]).attr('stroke','var(--surface)').attr('stroke-width',2)
+            .on('mouseover',(e,d)=>{tt.style('display','block').html(`<strong>${d[dk]}</strong><br>${key}: ${(+d[key]).toLocaleString()}`)})
+            .on('mousemove',e=>{tt.style('left',(e.pageX+12)+'px').style('top',(e.pageY-28)+'px')}).on('mouseout',()=>tt.style('display','none'));
+    });
+    if(nk.length>1){const lg=svg.append('g').attr('transform',`translate(${w-120},0)`);nk.forEach((k,i)=>{const g=lg.append('g').attr('transform',`translate(0,${i*18})`);g.append('rect').attr('width',10).attr('height',10).attr('rx',2).attr('fill',COLORS[i]);g.append('text').attr('x',14).attr('y',9).text(k).style('font-size','10px').style('font-family','Space Mono,monospace').attr('fill','#5a5a70')})}
+}
+function renderBarChart(c,info,rows){
+    const m={top:20,right:20,bottom:80,left:70},w=c.clientWidth-m.left-m.right,h=320-m.top-m.bottom,tt=d3.select('#tooltip');
+    const svg=d3.select(c).append('svg').attr('width',w+m.left+m.right).attr('height',h+m.top+m.bottom).append('g').attr('transform',`translate(${m.left},${m.top})`);
+    const ck=info.catCols.length?info.catCols[0].name:Object.keys(rows[0])[0],vk=info.numCols[0].name,data=rows.slice(0,30);
+    const x=d3.scaleBand().domain(data.map(d=>String(d[ck]))).range([0,w]).padding(.3);
+    const y=d3.scaleLinear().domain([0,d3.max(data,d=>+d[vk])*1.1]).range([h,0]);
+    svg.append('g').call(d3.axisLeft(y).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','rgba(255,255,255,.04)');svg.selectAll('.domain').remove();
+    svg.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x)).selectAll('text').attr('fill','#5a5a70').style('font-size','10px').style('font-family','Space Mono,monospace').attr('transform','rotate(-35)').style('text-anchor','end');
+    svg.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('~s'))).selectAll('text').attr('fill','#5a5a70').style('font-family','Space Mono,monospace');
+    svg.selectAll('.bar').data(data).join('rect').attr('x',d=>x(String(d[ck]))).attr('width',x.bandwidth()).attr('y',d=>y(+d[vk])).attr('height',d=>h-y(+d[vk])).attr('fill',(d,i)=>COLORS[i%COLORS.length]).attr('rx',3).attr('opacity',.85)
+        .on('mouseover',function(e,d){d3.select(this).attr('opacity',1).attr('filter','drop-shadow(0 0 8px '+COLORS[data.indexOf(d)%COLORS.length]+'44)');tt.style('display','block').html(`<strong>${d[ck]}</strong><br>${vk}: ${(+d[vk]).toLocaleString()}`)})
+        .on('mousemove',e=>{tt.style('left',(e.pageX+12)+'px').style('top',(e.pageY-28)+'px')})
+        .on('mouseout',function(){d3.select(this).attr('opacity',.85).attr('filter','none');tt.style('display','none')});
+}
+function renderDonutChart(c,info,rows){
+    const sz=Math.min(c.clientWidth,350),r=sz/2-20,tt=d3.select('#tooltip');
+    const svg=d3.select(c).append('svg').attr('width',sz).attr('height',sz).append('g').attr('transform',`translate(${sz/2},${sz/2})`);
+    const ck=info.catCols[0].name,vk=info.numCols[0].name;
+    const pie=d3.pie().value(d=>+d[vk]).sort(null),arc=d3.arc().innerRadius(r*.55).outerRadius(r),arcH=d3.arc().innerRadius(r*.55).outerRadius(r+8);
+    svg.selectAll('.slice').data(pie(rows)).join('g').append('path').attr('d',arc).attr('fill',(d,i)=>COLORS[i%COLORS.length]).attr('stroke','var(--surface)').attr('stroke-width',2)
+        .on('mouseover',function(e,d){d3.select(this).transition().duration(150).attr('d',arcH);const t=d3.sum(rows,r=>+r[vk]);tt.style('display','block').html(`<strong>${d.data[ck]}</strong><br>${vk}: ${(+d.data[vk]).toLocaleString()} (${(d.data[vk]/t*100).toFixed(1)}%)`)})
+        .on('mousemove',e=>{tt.style('left',(e.pageX+12)+'px').style('top',(e.pageY-28)+'px')})
+        .on('mouseout',function(){d3.select(this).transition().duration(150).attr('d',arc);tt.style('display','none')});
+}
+function renderScatterChart(c,info,rows){
+    const m={top:20,right:20,bottom:50,left:60},w=c.clientWidth-m.left-m.right,h=320-m.top-m.bottom,tt=d3.select('#tooltip');
+    const svg=d3.select(c).append('svg').attr('width',w+m.left+m.right).attr('height',h+m.top+m.bottom).append('g').attr('transform',`translate(${m.left},${m.top})`);
+    const xk=info.numCols[0].name,yk=info.numCols[1].name;
+    const x=d3.scaleLinear().domain(d3.extent(rows,d=>+d[xk])).nice().range([0,w]);
+    const y=d3.scaleLinear().domain(d3.extent(rows,d=>+d[yk])).nice().range([h,0]);
+    svg.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x).ticks(6)).selectAll('text').attr('fill','#5a5a70').style('font-family','Space Mono,monospace');
+    svg.append('g').call(d3.axisLeft(y).ticks(6)).selectAll('text').attr('fill','#5a5a70').style('font-family','Space Mono,monospace');
+    svg.append('text').attr('x',w/2).attr('y',h+38).attr('text-anchor','middle').style('font-size','10px').style('font-family','Space Mono,monospace').attr('fill','#5a5a70').text(xk);
+    svg.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-45).attr('text-anchor','middle').style('font-size','10px').style('font-family','Space Mono,monospace').attr('fill','#5a5a70').text(yk);
+    svg.selectAll('circle').data(rows).join('circle').attr('cx',d=>x(+d[xk])).attr('cy',d=>y(+d[yk])).attr('r',5).attr('fill',COLORS[0]).attr('opacity',.7).attr('stroke','var(--surface)').attr('stroke-width',1.5)
+        .on('mouseover',function(e,d){d3.select(this).attr('r',7).attr('opacity',1).attr('filter','drop-shadow(0 0 6px '+COLORS[0]+'66)');tt.style('display','block').html(`${xk}: ${(+d[xk]).toLocaleString()}<br>${yk}: ${(+d[yk]).toLocaleString()}`)})
+        .on('mousemove',e=>{tt.style('left',(e.pageX+12)+'px').style('top',(e.pageY-28)+'px')})
+        .on('mouseout',function(){d3.select(this).attr('r',5).attr('opacity',.7).attr('filter','none');tt.style('display','none')});
+}
+
+function toggleSql(){const p=document.getElementById('sqlPanel'),b=document.getElementById('sqlToggle');if(p.style.display==='block'){p.style.display='none';b.classList.remove('active')}else{p.style.display='block';b.classList.add('active');autoResizeSql()}}
+function copySql(){navigator.clipboard.writeText(document.getElementById('sqlCode').value);const btns=document.querySelectorAll('.sql-btn');const b=btns[0];b.textContent='COPIED!';setTimeout(()=>b.textContent='COPY',1500)}
+function autoResizeSql(){const el=document.getElementById('sqlCode');el.style.height='auto';el.style.height=Math.max(60,el.scrollHeight)+'px'}
+async function rerunSql(){
+    const sql=document.getElementById('sqlCode').value.trim();
+    if(!sql)return;
+    const db=document.getElementById('dbSelect').value;
+    const question=lastData?.question||'Manual SQL';
+    document.getElementById('error').style.display='none';
+    try{
+        const res=await fetch('/api/run-sql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql,database:db,question})});
+        const data=await res.json();
+        if(!res.ok)throw new Error(data.error||'Query failed');
+        lastData=data;
+        lastDebug=data.debug||{};
+        renderResults(data);
+    }catch(err){document.getElementById('errorText').textContent=err.message;document.getElementById('error').style.display='block'}
+}
+
+function downloadHtml(){
+    if(!lastData)return;
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Chat2Chart Report</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet"><style>body{font-family:'DM Sans',system-ui,sans-serif;background:#0a0a0f;color:#e8e8ef;padding:40px;max-width:1000px;margin:0 auto}h1{font-size:22px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}.sub{font-size:12px;color:#5a5a70;margin-bottom:20px}.sql{background:#12121a;color:#00e5a0;padding:16px;border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;margin-bottom:24px;overflow-x:auto;white-space:pre-wrap;border:1px solid #2a2a3a}.chart{margin-bottom:24px}table{width:100%;border-collapse:collapse;font-size:12px;font-family:'Space Mono',monospace}th{background:#1a1a26;padding:10px 14px;text-align:left;font-weight:700;color:#5a5a70;border-bottom:1px solid #2a2a3a;font-size:10px;text-transform:uppercase;letter-spacing:.8px}td{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.03);color:#9898aa}tr:hover{background:rgba(0,229,160,.05)}.ft{text-align:center;color:#3a3a4d;font-size:10px;margin-top:30px;padding-top:16px;border-top:1px solid #2a2a3a;font-family:'Space Mono',monospace}</style></head><body><h1>${lastData.question}</h1><div class="sub">${lastData.row_count} rows \u00b7 ${lastChartType} chart \u00b7 Chat2Chart</div><div class="sql">${lastData.sql}</div><div class="chart">${document.getElementById('chart').innerHTML}</div>${document.getElementById('dataTable').outerHTML}<div class="ft">Generated by Chat2Chart</div></body></html>`;
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='chat2chart-report.html';a.click();URL.revokeObjectURL(a.href);
+}
+function downloadPdf(){
+    if(!lastData)return;
+    window.print();
+}
+
+function renderHistory(){
+    const s=document.getElementById('historySection'),l=document.getElementById('historyList');
+    if(!history.length){s.style.display='none';return}s.style.display='block';
+    l.innerHTML=history.map(h=>{const eq=h.question.replace(/'/g,"\\'").replace(/"/g,'&quot;');return`<div class="history-item" onclick="rerun('${eq}')"><span>${h.question}</span><span class="meta">${h.rows} rows \u00b7 ${h.time}</span></div>`}).join('');
+}
+function rerun(q){const el=document.getElementById('question');el.value=q;el.style.height='auto';el.style.height=el.scrollHeight+'px';ask()}
+function clearHistory(){history=[];localStorage.removeItem('sqlviz_history');renderHistory()}
+</script>
+</body>
+</html>

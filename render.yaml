@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: chat2chart
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python setup_demo_db.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: GROQ_API_KEY
+        sync: false  # You'll set this in Render dashboard
