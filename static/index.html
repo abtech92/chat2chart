@@ -732,6 +732,75 @@ function renderHistory(){
 }
 function rerun(q){const el=document.getElementById('question');el.value=q;el.style.height='auto';el.style.height=el.scrollHeight+'px';ask()}
 function clearHistory(){history=[];localStorage.removeItem('sqlviz_history');renderHistory()}
+
+/* ---- Welcome Modal ---- */
+(function(){
+    if(localStorage.getItem('c2c_welcome_dismissed')) return;
+    const overlay=document.createElement('div');
+    overlay.id='welcomeOverlay';
+    overlay.innerHTML=`
+    <div id="welcomeModal">
+        <div class="wm-icon">
+            <svg width="48" height="48" viewBox="0 0 32 32"><defs><linearGradient id="wg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00e5a0"/><stop offset="100%" stop-color="#6c5ce7"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#wg)"/><path d="M22 16V8a2 2 0 00-2-2H8a2 2 0 00-2 2v10" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M10 24l5-5 5 5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="15" y1="19" x2="15" y2="15" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h2>Welcome to Chat2Chart</h2>
+        <p class="wm-sub">Ask questions about your data in plain English — get instant SQL + beautiful charts.</p>
+        <div class="wm-steps">
+            <div class="wm-step"><span class="wm-num">1</span><span>Type a question like <em>"monthly revenue trend"</em></span></div>
+            <div class="wm-step"><span class="wm-num">2</span><span>AI converts it to SQL and runs it on your database</span></div>
+            <div class="wm-step"><span class="wm-num">3</span><span>Results are visualized as interactive charts automatically</span></div>
+        </div>
+        <div class="wm-features">
+            <span class="wm-tag">Multiple Databases</span>
+            <span class="wm-tag">Multiple AI Models</span>
+            <span class="wm-tag">Auto Chart Detection</span>
+            <span class="wm-tag">Export PDF & HTML</span>
+            <span class="wm-tag">Editable SQL</span>
+        </div>
+        <div class="wm-dismiss">
+            <label class="wm-check"><input type="checkbox" id="welcomeNoShow"><span>Don't show this again</span></label>
+        </div>
+        <button id="welcomeStart">Get Started</button>
+    </div>`;
+
+    const style=document.createElement('style');
+    style.textContent=`
+    #welcomeOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:10000;animation:wfadeIn .3s ease}
+    @keyframes wfadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes wslideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    #welcomeModal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;max-width:480px;width:90%;text-align:center;animation:wslideUp .4s ease .1s both;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+    .wm-icon{margin-bottom:20px}
+    .wm-icon svg{width:48px;height:48px}
+    #welcomeModal h2{font-family:var(--sans);font-size:24px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-.03em}
+    .wm-sub{color:var(--text2);font-size:14px;margin-bottom:24px;line-height:1.5}
+    .wm-steps{text-align:left;margin-bottom:20px}
+    .wm-step{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:10px;margin-bottom:6px;background:var(--bg);font-size:13px;color:var(--text2);line-height:1.4}
+    .wm-step em{color:var(--accent);font-style:normal}
+    .wm-num{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-b));color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono)}
+    .wm-features{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:24px}
+    .wm-tag{font-size:11px;padding:4px 10px;border-radius:20px;background:var(--bg);border:1px solid var(--border);color:var(--text3);font-family:var(--mono)}
+    .wm-dismiss{margin-bottom:16px}
+    .wm-check{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text3)}
+    .wm-check input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+    #welcomeStart{background:linear-gradient(135deg,var(--accent),var(--accent-b));color:#fff;border:none;padding:12px 36px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .2s ease}
+    #welcomeStart:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,229,160,.25)}
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+
+    document.getElementById('welcomeStart').addEventListener('click',()=>{
+        if(document.getElementById('welcomeNoShow').checked) localStorage.setItem('c2c_welcome_dismissed','1');
+        overlay.style.animation='wfadeIn .2s ease reverse forwards';
+        setTimeout(()=>overlay.remove(),200);
+    });
+    overlay.addEventListener('click',(e)=>{
+        if(e.target===overlay){
+            if(document.getElementById('welcomeNoShow').checked) localStorage.setItem('c2c_welcome_dismissed','1');
+            overlay.style.animation='wfadeIn .2s ease reverse forwards';
+            setTimeout(()=>overlay.remove(),200);
+        }
+    });
+})();
 </script>
 </body>
 </html>
