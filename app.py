@@ -150,6 +150,14 @@ def load_db_configs():
     demo_path = os.path.join(os.path.dirname(__file__), "demo.db")
     if os.path.exists(demo_path):
         configs["demo"] = {"name": "Demo (SQLite)", "type": "sqlite", "path": demo_path}
+    # Load schema-only databases from schemas/ directory
+    schemas_dir = os.path.join(os.path.dirname(__file__), "schemas")
+    if os.path.isdir(schemas_dir):
+        for f in os.listdir(schemas_dir):
+            if f.endswith(".txt"):
+                key = f.replace(".txt", "")
+                name = key.replace("_", " ").replace("-", " ").title()
+                configs[key] = {"name": f"{name} (Schema Only)", "type": "schema_only", "schema_file": os.path.join(schemas_dir, f), "dialect": "mssql"}
     if os.environ.get("DATABASE_URL"):
         configs["primary"] = {"name": "Primary (PostgreSQL)", "type": "postgres", "url": os.environ["DATABASE_URL"]}
     if os.environ.get("MYSQL_URL"):
@@ -188,6 +196,9 @@ def get_connection(db_key: str):
 def get_db_schema(db_key: str) -> str:
     cfg = DB_CONFIGS[db_key]
     db_type = cfg["type"]
+    if db_type == "schema_only":
+        with open(cfg["schema_file"], "r") as f:
+            return f.read()
     conn = get_connection(db_key)
     try:
         cur = conn.cursor()
@@ -224,6 +235,23 @@ def get_db_schema(db_key: str) -> str:
 def get_db_schema_structured(db_key: str):
     cfg = DB_CONFIGS[db_key]
     db_type = cfg["type"]
+    if db_type == "schema_only":
+        tables = {}
+        with open(cfg["schema_file"], "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line.startswith("TABLE "):
+                    continue
+                parts = line.split(": ", 1)
+                tname = parts[0].replace("TABLE ", "")
+                cols = []
+                if len(parts) > 1:
+                    for col_str in parts[1].split(", "):
+                        m = re.match(r"(\w+)\s*\((.+)\)", col_str.strip())
+                        if m:
+                            cols.append({"name": m.group(1), "type": m.group(2)})
+                tables[tname] = {"columns": cols, "row_count": "N/A"}
+        return tables
     conn = get_connection(db_key)
     tables = {}
     try:
@@ -256,7 +284,10 @@ def get_db_schema_structured(db_key: str):
 
 
 def get_dialect(db_key: str) -> str:
-    return {"sqlite": "SQLite", "postgres": "PostgreSQL", "mysql": "MySQL"}.get(DB_CONFIGS[db_key]["type"], "SQL")
+    cfg = DB_CONFIGS[db_key]
+    if cfg["type"] == "schema_only":
+        return {"mssql": "T-SQL (SQL Server)", "postgres": "PostgreSQL", "mysql": "MySQL"}.get(cfg.get("dialect", "mssql"), "SQL")
+    return {"sqlite": "SQLite", "postgres": "PostgreSQL", "mysql": "MySQL"}.get(cfg["type"], "SQL")
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +399,7 @@ def ask():
         model = LLM_PROVIDERS[provider_key]["default_model"]
 
     debug = {}  # Collects input/output for every step
-    MAX_RETRIES = 3
+    MAX_RETRIES = 5
 
     try:
         # STEP 1: Read schema
@@ -429,6 +460,16 @@ Fix the query. Use only valid {dialect} syntax. Return ONLY the corrected SQL, n
                 last_error = str(ve)
                 continue
 
+            # Schema-only mode: skip execution, just validate SQL
+            if DB_CONFIGS[db_key]["type"] == "schema_only":
+                attempt_info["success"] = True
+                attempt_info["exec_ms"] = 0
+                attempts.append(attempt_info)
+                last_error = None
+                columns = []
+                rows = []
+                break
+
             # Try executing
             try:
                 t4 = time.time()
@@ -463,6 +504,7 @@ Fix the query. Use only valid {dialect} syntax. Return ONLY the corrected SQL, n
             return jsonify({"error": f"Failed after {len(attempts)} attempts: {last_error}", "debug": debug}), 400
 
         # STEP 3: Query succeeded
+        is_schema_only = DB_CONFIGS[db_key]["type"] == "schema_only"
         exec_ms = attempts[-1].get("exec_ms", 0)
         debug["step3_query"] = {
             "input": sql,
@@ -470,6 +512,7 @@ Fix the query. Use only valid {dialect} syntax. Return ONLY the corrected SQL, n
             "output_row_count": len(rows),
             "output_sample": rows[:5],
             "duration_ms": exec_ms,
+            "schema_only": is_schema_only,
         }
 
         return jsonify({
@@ -479,6 +522,7 @@ Fix the query. Use only valid {dialect} syntax. Return ONLY the corrected SQL, n
             "row_count": len(rows),
             "question": question,
             "debug": debug,
+            "schema_only": is_schema_only,
         })
 
     except ValueError as e:

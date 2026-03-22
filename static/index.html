@@ -494,6 +494,22 @@ function renderResults(data){
     document.getElementById('rowBadge').textContent=`${data.row_count} rows`;
     renderTable(data.columns,data.rows);
 
+    // Handle schema-only mode
+    if(data.schema_only){
+        const chartEl=document.getElementById('chart');
+        document.getElementById('chartTypeLabel').textContent='sql generated';
+        document.getElementById('chartTitle').textContent=data.question;
+        document.getElementById('chartSubtitle').textContent='Schema-only mode — no database connection';
+        chartEl.innerHTML=`<div style="text-align:center;padding:60px 20px">
+            <div style="font-size:48px;margin-bottom:16px">&#128269;</div>
+            <div style="font-size:16px;color:var(--accent);font-weight:600;margin-bottom:8px">SQL Query Generated Successfully</div>
+            <div style="font-size:13px;color:var(--text3);max-width:400px;margin:0 auto;line-height:1.5">This database is in <strong>schema-only mode</strong> — no live connection available. The SQL query above was generated based on the schema. Connect to the actual database to execute and visualize results.</div>
+        </div>`;
+        document.getElementById('chartSuggest').style.display='none';
+        lastChartType='sql_only';
+        return{type:'sql_only',reason:'Schema-only mode'};
+    }
+
     // Handle empty results
     if(!data.rows.length){
         const chartEl=document.getElementById('chart');
