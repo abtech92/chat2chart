@@ -14,3 +14,4 @@ __pycache__/
 *.cert
 .DS_Store
 node_modules/
+schemas/
