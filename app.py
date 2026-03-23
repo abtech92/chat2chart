@@ -3,12 +3,17 @@ import json
 import re
 import sqlite3
 import time
+import secrets
 from flask import Flask, request, jsonify, send_from_directory
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__, static_folder="static")
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"], storage_uri="memory://")
 
 
 # ---------------------------------------------------------------------------
@@ -315,9 +320,20 @@ def validate_sql(sql: str):
     normalized = sql.strip().upper()
     if not normalized.startswith("SELECT") and not normalized.startswith("WITH"):
         raise ValueError("Only SELECT queries are allowed.")
-    for kw in ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "CREATE", "GRANT", "REVOKE"]:
-        if re.search(rf';\s*{kw}\b', normalized):
+    # Block dangerous keywords anywhere in the query (not just after semicolons)
+    dangerous = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "CREATE",
+                 "GRANT", "REVOKE", "EXEC", "EXECUTE", "ATTACH", "DETACH", "LOAD",
+                 "COPY", "PRAGMA", "CALL", "MERGE", "REPLACE"]
+    for kw in dangerous:
+        # Match keyword as whole word anywhere except inside quoted strings
+        if re.search(rf'\b{kw}\b', normalized):
+            # Allow "REPLACE" only inside SELECT expressions (e.g. REPLACE(col, 'a', 'b'))
+            if kw == "REPLACE" and "REPLACE(" in normalized:
+                continue
             raise ValueError(f"Forbidden keyword detected: {kw}")
+    # Block multiple statements
+    if ";" in sql.strip().rstrip(";"):
+        raise ValueError("Multiple SQL statements are not allowed.")
 
 
 def run_query(sql: str, db_key: str):
@@ -378,6 +394,7 @@ def list_providers():
     return jsonify([{"key": k, "name": c["name"], "models": c["models"], "default_model": c["default_model"]} for k, c in LLM_PROVIDERS.items()])
 
 @app.route("/api/ask", methods=["POST"])
+@limiter.limit("30 per minute")
 def ask():
     body = request.get_json()
     question = body.get("question", "").strip()
@@ -537,6 +554,7 @@ Fix the query. Use only valid {dialect} syntax. Return ONLY the corrected SQL, n
 
 
 @app.route("/api/run-sql", methods=["POST"])
+@limiter.limit("60 per minute")
 def run_sql_direct():
     body = request.get_json()
     sql = body.get("sql", "").strip()
@@ -585,4 +603,5 @@ if __name__ == "__main__":
     if not LLM_PROVIDERS:
         print("  WARNING: No LLM providers configured!")
         print("  Set at least one: GROQ_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_URL\n")
-    app.run(debug=True, host="0.0.0.0", port=port)
+    is_dev = os.environ.get("FLASK_ENV", "development") == "development"
+    app.run(debug=is_dev, host="0.0.0.0", port=port)

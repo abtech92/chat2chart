@@ -1,4 +1,16 @@
 .env
+.env.local
+.env.production
+.env.*.local
 __pycache__/
 *.pyc
 .venv/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.key
+*.pem
+*.cert
+.DS_Store
+node_modules/

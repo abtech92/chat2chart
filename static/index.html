@@ -58,6 +58,8 @@
         .btn-primary::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.15) 50%,transparent 60%);transform:translateX(-100%);transition:transform .5s}
         .btn-primary:hover{box-shadow:0 0 24px var(--accent-glow),0 0 48px rgba(0,229,160,.08);transform:translateY(-1px)}.btn-primary:hover::after{transform:translateX(100%)}
         .btn-primary:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+        .btn-upload{background:var(--bg2);color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;font-family:var(--sans)}
+        .btn-upload:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,229,160,.06)}
 
         /* ---- CHIPS ---- */
         .examples{max-width:880px;margin:14px auto 0;padding:0 16px;display:flex;gap:6px;flex-wrap:wrap}
@@ -191,9 +193,10 @@
             .search-box{padding:14px;border-radius:12px}
             .config-row{flex-direction:column;gap:8px;margin-bottom:12px;padding-bottom:12px}
             .config-group{min-width:100%}
-            .input-row{flex-direction:column;gap:8px}
-            .input-row textarea{font-size:14px;min-height:44px;padding:12px 14px}
-            .btn-primary{width:100%;padding:14px;text-align:center;border-radius:10px}
+            .input-row{flex-wrap:wrap;gap:8px}
+            .input-row textarea{flex:1 1 100%;font-size:14px;min-height:44px;padding:12px 14px}
+            .btn-upload{flex:0 0 auto}
+            .btn-primary{flex:1;padding:14px;text-align:center;border-radius:10px}
             .examples{padding:0 10px;gap:6px;justify-content:center}
             .example-chip{font-size:11px;padding:6px 12px}
             .pipeline{padding:0 10px;margin:16px auto}
@@ -277,6 +280,8 @@
         </div>
         <div class="input-row">
             <textarea id="question" rows="1" placeholder='Ask anything... e.g. "Show me monthly revenue trends"' oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+            <input type="file" id="jsonFileInput" accept=".json" style="display:none" onchange="handleJsonUpload(event)">
+            <button class="btn-upload" onclick="document.getElementById('jsonFileInput').click()" title="Upload JSON to visualize">&#128206; JSON</button>
             <button class="btn-primary" id="askBtn" onclick="ask()">Visualize</button>
         </div>
     </div></div>
@@ -364,7 +369,7 @@ function renderSchema(tables){
     const p=document.getElementById('schemaPanel'),b=document.getElementById('schemaBody');
     if(!tables||!Object.keys(tables).length){p.style.display='none';return}
     p.style.display='block';
-    b.innerHTML=Object.entries(tables).map(([n,i])=>`<div class="schema-table"><div class="schema-table-name">${n}<span class="count">${i.row_count?i.row_count.toLocaleString()+' rows':''}</span></div><div class="schema-cols">${i.columns.map(c=>`<span class="schema-col">${c.name}<span class="col-type">${c.type}</span></span>`).join('')}</div></div>`).join('');
+    b.innerHTML=Object.entries(tables).map(([n,i])=>`<div class="schema-table"><div class="schema-table-name">${escHtml(n)}<span class="count">${i.row_count?escHtml(String(i.row_count))+' rows':''}</span></div><div class="schema-cols">${i.columns.map(c=>`<span class="schema-col">${escHtml(c.name)}<span class="col-type">${escHtml(c.type)}</span></span>`).join('')}</div></div>`).join('');
 }
 function toggleSchema(){document.getElementById('schemaHeader').classList.toggle('open');document.getElementById('schemaBody').classList.toggle('open')}
 
@@ -428,6 +433,67 @@ function stripChartKeywords(q){
             .replace(/\s{2,}/g,' ').trim();
 }
 
+function flattenRows(arr,parentKeys={}){
+    let flat=[];
+    for(const obj of arr){
+        const scalars={...parentKeys};
+        const nested=[];
+        for(const[k,v]of Object.entries(obj)){
+            if(Array.isArray(v)&&v.length>0&&typeof v[0]==='object'){nested.push([k,v])}
+            else if(typeof v==='object'&&v!==null){Object.entries(v).forEach(([sk,sv])=>scalars[k+'_'+sk]=sv)}
+            else{scalars[k]=v}
+        }
+        if(nested.length===0){flat.push(scalars)}
+        else{for(const[,arr2]of nested){flat=flat.concat(flattenRows(arr2,scalars))}}
+    }
+    return flat;
+}
+
+function handleJsonUpload(event){
+    const file=event.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=function(e){
+        try{
+            let raw=JSON.parse(e.target.result);
+            // Support common JSON structures
+            let rows=[];
+            if(Array.isArray(raw)){rows=raw}
+            else if(raw.data&&Array.isArray(raw.data)){rows=raw.data}
+            else if(raw.results&&Array.isArray(raw.results)){rows=raw.results}
+            else if(raw.rows&&Array.isArray(raw.rows)){rows=raw.rows}
+            else{
+                // Try to find first array property
+                for(const k of Object.keys(raw)){if(Array.isArray(raw[k])&&raw[k].length>0&&typeof raw[k][0]==='object'){rows=raw[k];break}}
+            }
+            if(!rows.length||typeof rows[0]!=='object'){
+                document.getElementById('errorText').textContent='JSON file must contain an array of objects, e.g. [{"name":"Alice","age":30}, ...]';
+                document.getElementById('error').style.display='block';
+                event.target.value='';return;
+            }
+            // Auto-flatten nested structures
+            const hasNested=rows.some(r=>Object.values(r).some(v=>Array.isArray(v)&&v.length>0&&typeof v[0]==='object'));
+            if(hasNested){rows=flattenRows(rows)}
+            const columns=Object.keys(rows[0]);
+            // Clean rows to plain objects
+            const cleanRows=rows.map(r=>{const o={};columns.forEach(c=>o[c]=r[c]??null);return o});
+            // Show results directly — skip pipeline
+            document.getElementById('error').style.display='none';
+            document.getElementById('pipeline').style.display='block';
+            resetPipeline();
+            // Mark all steps as complete
+            for(let i=1;i<=4;i++){const el=document.getElementById('step'+i);el.classList.add('done');document.getElementById('step'+i+'Detail').textContent=i===1?'JSON loaded':i===2?'Skipped':i===3?'Skipped':'Done'}
+            document.getElementById('pipelineInfo').textContent=`Source: ${file.name} · ${cleanRows.length} rows · ${columns.length} columns`;
+            const data={sql:'-- Loaded from JSON file: '+file.name,columns,rows:cleanRows,row_count:cleanRows.length,question:file.name.replace('.json','').replace(/[-_]/g,' '),debug:null,schema_only:false};
+            lastData=data;
+            document.getElementById('resultsArea').style.display='block';
+            renderResults(data);
+            addHistory(file.name.replace('.json',''),cleanRows.length);
+        }catch(err){document.getElementById('errorText').textContent='Invalid JSON file: '+err.message;document.getElementById('error').style.display='block'}
+        event.target.value='';
+    };
+    reader.readAsText(file);
+}
+
 async function ask(){
     const question=document.getElementById('question').value.trim();if(!question)return;
     document.getElementById('error').style.display='none';document.getElementById('resultsArea').style.display='none';
@@ -439,7 +505,7 @@ async function ask(){
     const providerName=document.getElementById('providerSelect').selectedOptions[0]?.textContent||provider;
     const info=document.getElementById('pipelineInfo');
     info.style.display='block';
-    info.innerHTML=`<strong>DB:</strong> ${dbName} &nbsp;\u00b7&nbsp; <strong>Provider:</strong> ${providerName} &nbsp;\u00b7&nbsp; <strong>Model:</strong> <code style="background:var(--bg2);padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);color:var(--accent);border:1px solid var(--border)">${model}</code> &nbsp;\u00b7&nbsp; <span style="color:var(--text3)">Click any step number to see input/output</span>`;
+    info.innerHTML=`<strong>DB:</strong> ${escHtml(dbName)} &nbsp;\u00b7&nbsp; <strong>Provider:</strong> ${escHtml(providerName)} &nbsp;\u00b7&nbsp; <strong>Model:</strong> <code style="background:var(--bg2);padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);color:var(--accent);border:1px solid var(--border)">${escHtml(model)}</code> &nbsp;\u00b7&nbsp; <span style="color:var(--text3)">Click any step number to see input/output</span>`;
     const startTime=Date.now();
 
     // Strip chart keywords before sending to LLM — keep original for chart detection
@@ -532,7 +598,7 @@ function renderResults(data){
     if(ci.requestedFailed){
         const chartNames={line:'Line Chart',bar:'Bar Chart',donut:'Donut/Pie Chart',scatter:'Scatter Plot',stat:'Stat Card',table:'Table'};
         suggestEl.style.display='block';
-        suggestEl.innerHTML=`<div class="inner"><div class="msg">${ci.failReason}. Showing as <strong>${chartNames[ci.type]||ci.type}</strong> instead.</div><button class="suggest-btn" onclick="acceptSuggestion()">Got it</button></div>`;
+        suggestEl.innerHTML=`<div class="inner"><div class="msg">${escHtml(ci.failReason)}. Showing as <strong>${escHtml(chartNames[ci.type]||ci.type)}</strong> instead.</div><button class="suggest-btn" onclick="acceptSuggestion()">Got it</button></div>`;
     } else {
         suggestEl.style.display='none';
     }
@@ -558,10 +624,10 @@ function renderResults(data){
 }
 function acceptSuggestion(){document.getElementById('chartSuggest').style.display='none'}
 function renderTable(cols,rows){
-    document.getElementById('tableHead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+    document.getElementById('tableHead').innerHTML='<tr>'+cols.map(c=>`<th>${escHtml(c)}</th>`).join('')+'</tr>';
     document.getElementById('tableBody').innerHTML=rows.slice(0,200).map(r=>'<tr>'+cols.map(c=>`<td>${fmtCell(r[c])}</td>`).join('')+'</tr>').join('');
 }
-function fmtCell(v){if(v===null||v===undefined)return'<span style="color:var(--text3)">null</span>';if(typeof v==='number')return v.toLocaleString();return String(v)}
+function fmtCell(v){if(v===null||v===undefined)return'<span style="color:var(--text3)">null</span>';if(typeof v==='number')return v.toLocaleString();return escHtml(String(v))}
 
 // --- Parse user-requested chart type from question ---
 function parseRequestedChart(question){
@@ -651,7 +717,7 @@ function renderChart(info,cols,rows){const c=document.getElementById('chart');c.
     else if(info.type==='donut')renderDonutChart(c,info,rows);
     else if(info.type==='scatter')renderScatterChart(c,info,rows);
 }
-function renderStatCard(c,cols,rows){const r=rows[0];c.innerHTML=cols.map((col,i)=>{const v=r[col];return`<div style="text-align:center;padding:36px"><div style="font-size:48px;font-weight:700;color:${COLORS[i%COLORS.length]};letter-spacing:-.03em;font-family:var(--sans);text-shadow:0 0 40px ${COLORS[i%COLORS.length]}33">${typeof v==='number'?v.toLocaleString():v}</div><div style="font-size:10px;color:var(--text3);margin-top:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">${col}</div></div>`}).join('')}
+function renderStatCard(c,cols,rows){const r=rows[0];c.innerHTML=cols.map((col,i)=>{const v=r[col];return`<div style="text-align:center;padding:36px"><div style="font-size:48px;font-weight:700;color:${COLORS[i%COLORS.length]};letter-spacing:-.03em;font-family:var(--sans);text-shadow:0 0 40px ${COLORS[i%COLORS.length]}33">${typeof v==='number'?v.toLocaleString():escHtml(String(v))}</div><div style="font-size:10px;color:var(--text3);margin-top:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">${escHtml(col)}</div></div>`}).join('')}
 function renderLineChart(c,info,rows){
     const m={top:20,right:30,bottom:60,left:60},w=c.clientWidth-m.left-m.right,h=320-m.top-m.bottom,tt=d3.select('#tooltip');
     const svg=d3.select(c).append('svg').attr('width',w+m.left+m.right).attr('height',h+m.top+m.bottom).append('g').attr('transform',`translate(${m.left},${m.top})`);
@@ -744,7 +810,7 @@ function downloadPdf(){
 function renderHistory(){
     const s=document.getElementById('historySection'),l=document.getElementById('historyList');
     if(!history.length){s.style.display='none';return}s.style.display='block';
-    l.innerHTML=history.map(h=>{const eq=h.question.replace(/'/g,"\\'").replace(/"/g,'&quot;');return`<div class="history-item" onclick="rerun('${eq}')"><span>${h.question}</span><span class="meta">${h.rows} rows \u00b7 ${h.time}</span></div>`}).join('');
+    l.innerHTML=history.map(h=>{const eq=escHtml(h.question).replace(/'/g,'&#39;');return`<div class="history-item" onclick="rerun('${eq}')"><span>${escHtml(h.question)}</span><span class="meta">${escHtml(String(h.rows))} rows \u00b7 ${escHtml(h.time)}</span></div>`}).join('');
 }
 function rerun(q){const el=document.getElementById('question');el.value=q;el.style.height='auto';el.style.height=el.scrollHeight+'px';ask()}
 function clearHistory(){history=[];localStorage.removeItem('sqlviz_history');renderHistory()}
