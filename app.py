@@ -153,6 +153,12 @@ def call_llm(provider_key: str, model: str, prompt: str, max_tokens: int = 4096)
 def load_db_configs():
     configs = {}
     demo_path = os.path.join(os.path.dirname(__file__), "demo.db")
+    if not os.path.exists(demo_path):
+        # Auto-generate demo database on first run
+        setup_script = os.path.join(os.path.dirname(__file__), "setup_demo_db.py")
+        if os.path.exists(setup_script):
+            import subprocess
+            subprocess.run([os.sys.executable, setup_script], cwd=os.path.dirname(__file__))
     if os.path.exists(demo_path):
         configs["demo"] = {"name": "Demo (SQLite)", "type": "sqlite", "path": demo_path}
     # Load schema-only databases from schemas/ directory
